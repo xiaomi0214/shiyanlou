@@ -26,12 +26,19 @@
 同样，其他的 -d 和 -o 参数也用这种方法获得。
 
 在3基础的改进：增加多进程和queue
+在4基础的上改进：
+1。使用 getopt 模块处理命令行参数
+2.使用 Python3 中的 configparser 模块读取配置文件
+3.使用 datetime 模块写入工资单生成时间
 """
 
 import sys
 import os
 import json
 from multiprocessing import Process,Queue
+from getopt import getopt
+from datetime import datetime
+from configparser import ConfigParser
 confDict={}
 
 class UserInfor(object):
@@ -54,15 +61,16 @@ class UserInfor(object):
         :return:
         """
         # print (self._confIns.getConfig('YangLao'))
+        # print(self._confIns.getConfig('JiShuH'.lower()))
 
-        if self._infDict.get('gongzi')>self._confIns.getConfig('JiShuH'):
-            gongzi=self._confIns.getConfig('JiShuH')
-        elif self._infDict.get('gongzi')<self._confIns.getConfig('JiShuL'):
-            gongzi=self._confIns.getConfig('JiShuL')
+        if self._infDict.get('gongzi')>self._confIns.getConfig('JiShuH'.lower()):
+            gongzi=self._confIns.getConfig('JiShuH'.lower())
+        elif self._infDict.get('gongzi')<self._confIns.getConfig('JiShuL'.lower()):
+            gongzi=self._confIns.getConfig('JiShuL'.lower())
         else:
             gongzi=self._infDict.get('gongzi')
         
-        Shebao=gongzi*(self._confIns.getConfig('YangLao')+self._confIns.getConfig('YiLiao')+self._confIns.getConfig('ShiYe')+self._confIns.getConfig('GongShang')+self._confIns.getConfig('ShengYu')+self._confIns.getConfig('GongJiJin'))
+        Shebao=gongzi*(self._confIns.getConfig('YangLao'.lower())+self._confIns.getConfig('YiLiao'.lower())+self._confIns.getConfig('ShiYe'.lower())+self._confIns.getConfig('GongShang'.lower())+self._confIns.getConfig('ShengYu'.lower())+self._confIns.getConfig('GongJiJin'.lower()))
         return Shebao
 
     ##计算个人税
@@ -103,7 +111,7 @@ class UserInfor(object):
         return AfterGongzi
 
     def getResult(self):
-        return "{gonghao},{gongzi},{shebao},{shui},{gongziafter}\n".format(gonghao=self._infDict.get("number"),gongzi=self._infDict.get("gongzi"),shebao=format(float(self.getSheBao()),'.2f'),shui=format(float(self.getShui()),'.2f'),gongziafter=format(float(self.getAfterGongzi()),'.2f'))
+        return "{gonghao},{gongzi},{shebao},{shui},{gongziafter},{caTime}\n".format(gonghao=self._infDict.get("number"),gongzi=self._infDict.get("gongzi"),shebao=format(float(self.getSheBao()),'.2f'),shui=format(float(self.getShui()),'.2f'),gongziafter=format(float(self.getAfterGongzi()),'.2f'),caTime=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     ##每次打开文件，是否会增加io
     def writeInf(self,dst):
@@ -206,11 +214,23 @@ def getUserInf(srcDir,queueUser):
 
 def getarg():
     global confDict
+    options,argv=getopt(sys.argv[1:],"hC:c:d:o:",["help"])
+    optDict=dict(options)
+    if '-h' in optDict.keys() or '--help' in optDict.keys():
+        print("Usage: calculator.py -C cityname -c configfile -d userdata -o resultdata")
+        exit(0)
+    if '-C' in optDict.keys():
+        cityname=optDict.get('-C').upper()
+    else:
+        cityname="DEFAULT"
 
-    argvs=sys.argv[1:]
-    confDir=argvs[argvs.index('-c')+1]
-    srcDir = argvs[argvs.index('-d') + 1]
-    dstDir = argvs[argvs.index('-o') + 1]
+    confDir=optDict.get('-c')
+    srcDir=optDict.get('-d')
+    dstDir=optDict.get('-o')
+    # argvs=sys.argv[1:]
+    # confDir=argvs[argvs.index('-c')+1]
+    # srcDir = argvs[argvs.index('-d') + 1]
+    # dstDir = argvs[argvs.index('-o') + 1]
     # print(confDir,srcDir,dstDir)
     # confDir="test.cfg"
     # srcDir="user.csv"
@@ -230,14 +250,21 @@ def getarg():
     JiShuL = 2193.00
     JiShuH = 16446.00
     """
+    conf=ConfigParser()
+    conf.read(confDir)
+    # print(conf.options(cityname))
+    for option in conf.options(cityname):
+        # print(option)
+        confDict[option]=float(conf.get(cityname,option))
+    # print(confDict)
 
 
-    fileResult=readConfFile(confDir)
-    for line in fileResult.split('\n'):
-        if not line:
-            continue
-        confKey,confVal=line.split('=')
-        confDict[confKey.strip(' ')]=float(confVal.strip(' '))
+    # fileResult=readConfFile(confDir)
+    # for line in fileResult.split('\n'):
+    #     if not line:
+    #         continue
+    #     confKey,confVal=line.split('=')
+    #     confDict[confKey.strip(' ')]=float(confVal.strip(' '))
 
     confIns=Conf(confDict)
 
